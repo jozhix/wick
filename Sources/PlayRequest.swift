@@ -8,7 +8,7 @@ import Foundation
 ///   vlc-x-callback://x-callback-url/stream?url=<enc>
 ///   open-vidhub://x-callback-url/open?url=<enc>
 /// Infuse links additionally carry `position`, `filename`, `sub`, `x-success`, `x-error`.
-/// This parser accepts all of those plus our own `aetherplayer://play?...` form.
+/// This parser accepts all of those plus our own `wick://play?...` form.
 struct PlayRequest: Equatable {
     var mediaURL: URL
     var title: String?

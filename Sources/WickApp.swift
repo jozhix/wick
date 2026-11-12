@@ -2,7 +2,7 @@ import SwiftUI
 import HostDeps
 
 @main
-struct AetherPlayerApp: App {
+struct WickApp: App {
     @StateObject private var model = PlayerModel()
 
     var body: some Scene {

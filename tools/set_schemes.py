@@ -5,8 +5,8 @@ tvOS reads an app's URL schemes from its Info.plist when the app is installed, s
 cannot change them while running. This script rewrites them inside the .ipa instead, in
 seconds, on any OS (no Mac, no rebuild). Upload the result to atvloadly.
 
-  python set_schemes.py AetherPlayer.ipa AetherPlayer_senplayer.ipa senplayer
-  python set_schemes.py AetherPlayer.ipa out.ipa senplayer vlc svplayer
+  python set_schemes.py Wick.ipa Wick_senplayer.ipa senplayer
+  python set_schemes.py Wick.ipa out.ipa senplayer vlc svplayer
 
 Names (Lampa Apple TV player -> URL scheme Lampa opens):
   vlc        vlc-x-callback
@@ -35,7 +35,7 @@ ALIASES = {
 
 
 def resolve(names):
-    schemes = ["aetherplayer"]  # always kept: our own link form
+    schemes = ["wick"]  # always kept: our own link form
     for name in names:
         n = name.strip().lower()
         if n == "inner":

@@ -1,4 +1,4 @@
-# Aether Player (draft)
+# Wick (draft)
 
 A small tvOS player built on [AetherEngine](https://github.com/superuser404notfound/AetherEngine) that Lampa can use as an external player for torrent streams.
 
@@ -13,7 +13,7 @@ Lampa has no hook to register a new player. On Apple TV it picks a URL template 
 | VLC | `vlc-x-callback://x-callback-url/stream?url=...` | no (edit `project.yml` to use it) |
 | VidHub | `open-vidhub://x-callback-url/open?url=...` | no (use it only if the real VidHub is not installed) |
 
-Also accepted: `aetherplayer://play?url=...&title=...&position=...&sub=...&x-success=...&x-error=...&x-cancel=...&return=...`, and Infuse-style links with `position`, `filename`, `sub`, `x-success`, `x-error`.
+Also accepted: `wick://play?url=...&title=...&position=...&sub=...&x-success=...&x-error=...&x-cancel=...&return=...`, and Infuse-style links with `position`, `filename`, `sub`, `x-success`, `x-error`.
 
 **Do not install the real SenPlayer** next to this app: tvOS would pick one of the two for that scheme.
 
@@ -21,8 +21,8 @@ Also accepted: `aetherplayer://play?url=...&title=...&position=...&sub=...&x-suc
 tvOS reads an app's URL schemes from its `Info.plist` at install time, so an app cannot switch them while running. Instead, `tools/set_schemes.py` rewrites them inside the `.ipa` in seconds, on Windows, with no rebuild:
 
 ```bash
-python tools/set_schemes.py AetherPlayer.ipa AetherPlayer_vlc.ipa vlc
-python tools/set_schemes.py AetherPlayer.ipa out.ipa senplayer svplayer   # several at once
+python tools/set_schemes.py Wick.ipa Wick_vlc.ipa vlc
+python tools/set_schemes.py Wick.ipa out.ipa senplayer svplayer   # several at once
 ```
 
 | Name | Scheme Lampa opens |
@@ -71,12 +71,12 @@ Needs macOS and Xcode (the engine's README says Xcode 27). CI does this:
 
 1. Make this folder its own **private** GitHub repo (it is self-contained; the workflow is in `.github/workflows/build-ipa.yml`).
 2. Run the workflow "Build unsigned IPA" (also runs on push to `main`).
-3. Download the `AetherPlayer-ipa` artifact → `AetherPlayer.ipa`. If the build fails, the `build-log` artifact has the full log.
+3. Download the `Wick-ipa` artifact → `Wick.ipa`. If the build fails, the `build-log` artifact has the full log.
 
-Locally on a Mac: `brew install xcodegen && xcodegen generate`, then open `AetherPlayer.xcodeproj`.
+Locally on a Mac: `brew install xcodegen && xcodegen generate`, then open `Wick.xcodeproj`.
 
 ## Install
-1. atvloadly web UI → upload `AetherPlayer.ipa` → install with your Apple ID.
+1. atvloadly web UI → upload `Wick.ipa` → install with your Apple ID.
 2. A free Apple ID allows **3 active sideloaded apps**. atvloadly refreshes them on its schedule.
 3. In Lampa: Settings → Player → the Apple TV torrent player → **SenPlayer**.
 4. Start a torrent movie in Lampa. Lampa opens this app.

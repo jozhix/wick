@@ -14,7 +14,7 @@ enum RegisteredPlayers {
         "senplayer": "SenPlayer",
         "open-vidhub": "VidHub",
         "svplayer": "SVPlayer",
-        "aetherplayer": "Own link form",
+        "wick": "Own link form",
     ]
 
     static var current: [Entry] {

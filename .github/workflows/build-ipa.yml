@@ -29,14 +29,14 @@ jobs:
         run: xcodegen generate
 
       - name: Resolve packages
-        run: xcodebuild -resolvePackageDependencies -project AetherPlayer.xcodeproj -scheme AetherPlayer
+        run: xcodebuild -resolvePackageDependencies -project Wick.xcodeproj -scheme Wick
 
       - name: Build (unsigned, tvOS device SDK)
         run: |
           set -o pipefail
           xcodebuild build \
-            -project AetherPlayer.xcodeproj \
-            -scheme AetherPlayer \
+            -project Wick.xcodeproj \
+            -scheme Wick \
             -configuration Release \
             -sdk appletvos \
             -destination 'generic/platform=tvOS' \
@@ -46,20 +46,20 @@ jobs:
 
       - name: Package .ipa
         run: |
-          APP=$(find build/Build/Products -maxdepth 3 -name 'AetherPlayer.app' | head -1)
-          test -n "$APP" || { echo "AetherPlayer.app not found"; exit 1; }
-          rm -rf Payload AetherPlayer.ipa
+          APP=$(find build/Build/Products -maxdepth 3 -name 'Wick.app' | head -1)
+          test -n "$APP" || { echo "Wick.app not found"; exit 1; }
+          rm -rf Payload Wick.ipa
           mkdir Payload
           cp -R "$APP" Payload/
-          zip -qry AetherPlayer.ipa Payload
-          ls -lh AetherPlayer.ipa
+          zip -qry Wick.ipa Payload
+          ls -lh Wick.ipa
           /usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes' "$APP/Info.plist"
           ls "$APP/Frameworks" || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AetherPlayer-ipa
-          path: AetherPlayer.ipa
+          name: Wick-ipa
+          path: Wick.ipa
 
       - uses: actions/upload-artifact@v4
         if: always()

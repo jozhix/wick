@@ -105,7 +105,7 @@ struct SettingsScreen: View {
                     LabeledContent("DTS:X", value: settings.hasDTSX ? "in this build" : "not in this build")
                 }
             }
-            .navigationTitle("Aether Player")
+            .navigationTitle("Wick")
         }
     }
 
