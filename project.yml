@@ -27,8 +27,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.wick.tv
         PRODUCT_NAME: Wick
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.2.0"
+        CURRENT_PROJECT_VERSION: "3"
         # Swift 5 language mode keeps strict-concurrency errors out of the host code.
         # The engine itself is built by SwiftPM with its own settings.
         SWIFT_VERSION: "5.0"

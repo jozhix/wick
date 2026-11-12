@@ -83,16 +83,21 @@ private struct RemoteCatcher: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        Color.clear
-            .contentShape(Rectangle())
-            .ignoresSafeArea()
-            .focusable()
-            .focused($focused)
-            .onMoveCommand { model.move($0) }
-            .onPlayPauseCommand { model.playPause() }
-            .onExitCommand { model.menuButton() }
-            .onTapGesture { model.select() }
-            .onAppear { focused = true }
+        // A Button receives the Select press reliably on tvOS (a tap gesture sometimes needed a second click).
+        Button {
+            model.select()
+        } label: {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(BareButtonStyle())
+        .ignoresSafeArea()
+        .focused($focused)
+        .onMoveCommand { model.move($0) }
+        .onPlayPauseCommand { model.playPause() }
+        .onExitCommand { model.menuButton() }
+        .onAppear { focused = true }
     }
 }
 

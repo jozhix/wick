@@ -71,7 +71,7 @@ enum SettingsPage: Hashable {
         case .audio: return "Atmos height speakers, the audio bridge, delay and language."
         case .subtitles: return "Preferred language and size."
         case .lampa: return "Where playback returns to, and which Lampa player names this app answers to."
-        case .about: return "Version and which optional engine components this build contains."
+        case .about: return "Version, optional engine components and credits."
         case .dolbyVision: return "Use Dolby Vision where the display allows it, or always play the HDR10 base layer."
         case .fel: return "How Profile 7 FEL (dual-layer) streams are handled."
         case .atmos: return "TrueHD Atmos and DTS:X are rendered into this speaker layout. Pick what your receiver drives."
@@ -344,6 +344,11 @@ struct SettingsScreen: View {
                 SItem(id: "c2", kind: .info, title: "FEL Curves", value: settings.hasFelCurves ? "In build" : "Missing"),
                 SItem(id: "c3", kind: .info, title: "TrueHD Atmos", value: settings.hasTrueHD ? "In build" : "Missing"),
                 SItem(id: "c4", kind: .info, title: "DTS:X", value: settings.hasDTSX ? "In build" : "Missing"),
+                SItem(id: "h.credits", kind: .header, title: "Made By"),
+                SItem(id: "cr1", kind: .info, title: "Designed and built by", value: "jozhix"),
+                SItem(id: "cr2", kind: .info, title: "Written with", value: "Claude (Anthropic)"),
+                SItem(id: "cr3", kind: .info, title: "Playback engine", value: "AetherEngine, LGPL-3.0"),
+                SItem(id: "cr4", kind: .info, title: "Look inspired by", value: "Rivulet"),
             ]
 
         // MARK: choice lists
