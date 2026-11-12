@@ -1,0 +1,60 @@
+# XcodeGen spec. CI runs `xcodegen generate` to create AetherPlayer.xcodeproj.
+# (There is no Mac here, so the .xcodeproj is not checked in.)
+name: AetherPlayer
+options:
+  bundleIdPrefix: app.aetherplayer
+  deploymentTarget:
+    tvOS: "18.0"
+  createIntermediateGroups: true
+
+packages:
+  # Local wrapper that depends on AetherEngine with its optional components
+  # (package traits) switched on. See HostDeps/Package.swift. Pin the engine
+  # version there once a build has been tested.
+  HostDeps:
+    path: HostDeps
+
+targets:
+  AetherPlayer:
+    type: application
+    platform: tvOS
+    sources:
+      - Sources
+    dependencies:
+      - package: HostDeps
+        product: HostDeps
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.aetherplayer.tv
+        PRODUCT_NAME: AetherPlayer
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # Swift 5 language mode keeps strict-concurrency errors out of the host code.
+        # The engine itself is built by SwiftPM with its own settings.
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "3"
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Aether Player
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # URL schemes this app answers. Lampa opens a URL like
+        #   SenPlayer://x-callback-url/play?url=<encoded stream URL>
+        # when the Apple TV player setting is "SenPlayer", so claiming that scheme
+        # makes Lampa hand the stream to this app. Do not also install the real
+        # SenPlayer (tvOS would pick one of the two arbitrarily).
+        # The list is fixed at install time. To change it WITHOUT rebuilding, run
+        #   python tools/set_schemes.py AetherPlayer.ipa out.ipa vlc senplayer ...
+        # Lampa player -> scheme: vlc = vlc-x-callback, infuse = infuse,
+        # senplayer = senplayer, vidhub = open-vidhub, svplayer = svplayer.
+        # (Lampa's "inner" player has no URL scheme.)
+        CFBundleURLTypes:
+          - CFBundleURLName: app.aetherplayer.tv
+            CFBundleURLSchemes:
+              - aetherplayer
+              - senplayer
+        # Torrent streams come from TorrServer over plain http on the LAN.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        NSLocalNetworkUsageDescription: Aether Player streams video from a server on your home network.
