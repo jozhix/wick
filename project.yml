@@ -33,6 +33,7 @@ targets:
         # The engine itself is built by SwiftPM with its own settings.
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "3"
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
     info:
       path: Sources/Info.plist
       properties:

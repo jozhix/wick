@@ -8,3 +8,5 @@ build.log
 xcuserdata/
 DerivedData/
 Sources/Info.plist
+downloads/
+tools/icon-preview.png

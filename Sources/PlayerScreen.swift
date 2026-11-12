@@ -5,10 +5,16 @@ import HostDeps
 /// The video surface itself lives in the app root so it is always bound to the engine.
 struct PlayerScreen: View {
     @ObservedObject var model: PlayerModel
-    @FocusState private var rootFocused: Bool
 
     var body: some View {
         ZStack {
+            // The remote handler is a SIBLING of the panel, never its parent. As a parent it
+            // swallowed every arrow press (skip / open panel) before the panel's buttons could
+            // take focus, so nothing in the panel could be selected.
+            if !model.panelVisible {
+                RemoteCatcher(model: model)
+            }
+
             SubtitleLayer(cues: model.visibleCues, size: model.settings.v.subtitleSize.points)
                 .allowsHitTesting(false)
 
@@ -32,30 +38,39 @@ struct PlayerScreen: View {
                     Spacer()
                     TransportBar(model: model)
                 }
+                .allowsHitTesting(false)
             }
 
             if model.panelVisible {
                 TrackPanel(model: model)
-                    .onExitCommand { model.handleExit() }
             }
         }
-        .focusable(!model.panelVisible)
-        .focused($rootFocused)
-        .onMoveCommand { direction in
-            switch direction {
-            case .left: model.skip(-1)
-            case .right: model.skip(1)
-            case .up, .down: model.openPanel()
-            @unknown default: break
+    }
+}
+
+/// Full-screen invisible view that owns the Siri Remote while the panel is closed.
+private struct RemoteCatcher: View {
+    @ObservedObject var model: PlayerModel
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .ignoresSafeArea()
+            .focusable()
+            .focused($focused)
+            .onMoveCommand { direction in
+                switch direction {
+                case .left: model.skip(-1)
+                case .right: model.skip(1)
+                case .up, .down: model.openPanel()
+                @unknown default: break
+                }
             }
-        }
-        .onPlayPauseCommand { model.togglePlayPause() }
-        .onExitCommand { model.handleExit() }
-        .onTapGesture { model.togglePlayPause() }
-        .onAppear { rootFocused = true }
-        .onChange(of: model.panelVisible) { _, visible in
-            if !visible { rootFocused = true }
-        }
+            .onPlayPauseCommand { model.togglePlayPause() }
+            .onExitCommand { model.handleExit() }
+            .onTapGesture { model.togglePlayPause() }
+            .onAppear { focused = true }
     }
 }
 
@@ -120,6 +135,7 @@ private struct TransportBar: View {
 
 private struct TrackPanel: View {
     @ObservedObject var model: PlayerModel
+    @Namespace private var focusNS
 
     var body: some View {
         ZStack {
@@ -136,6 +152,7 @@ private struct TrackPanel: View {
                                     Label(model.label(for: track),
                                           systemImage: model.activeAudio == track.id ? "checkmark.circle.fill" : "circle")
                                 }
+                                .prefersDefaultFocus(model.activeAudio == track.id, in: focusNS)
                             }
                         }
                         VStack(alignment: .leading, spacing: 12) {
@@ -173,6 +190,8 @@ private struct TrackPanel: View {
                 .padding(80)
             }
         }
+        .focusScope(focusNS)
+        .onExitCommand { model.handleExit() }
     }
 }
 
