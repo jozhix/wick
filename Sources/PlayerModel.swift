@@ -5,8 +5,22 @@ import HostDeps
 
 enum PlaybackOutcome { case success, cancel, failure }
 
+/// What the Siri Remote is currently driving. Wick handles focus itself (one invisible
+/// focusable view receives every press), so these modes are the whole navigation model.
+enum UIMode: Equatable {
+    case hidden            // video only
+    case anchor            // transport bar shown, left/right skip
+    case tools(Int)        // bottom-right round buttons: 0 subtitles, 1 audio, 2 playback
+    case pills(Int)        // Info / Details panes: 0 info, 1 details
+    case menu              // a glass menu is open (see menuStack)
+}
+
+enum MenuKind: Equatable {
+    case subtitles, subtitleLanguage, audio, playback
+}
+
 /// Owns the one long-lived engine, mirrors its published state for SwiftUI,
-/// and handles the Lampa hand-off (open a request, report back when done).
+/// handles remote input, and handles the Lampa hand-off.
 @MainActor
 final class PlayerModel: ObservableObject {
     let engine: AetherEngine
@@ -14,7 +28,7 @@ final class PlayerModel: ObservableObject {
 
     // Request / status
     @Published var request: PlayRequest?
-    @Published var message: String?          // shown on the idle screen (bad link etc.)
+    @Published var message: String?          // shown on the settings screen (bad link etc.)
     @Published var loadError: String?
 
     // Mirrored engine state
@@ -30,14 +44,23 @@ final class PlayerModel: ObservableObject {
     @Published var cues: [SubtitleCue] = []
 
     // UI state
-    @Published var controlsVisible = true
-    @Published var panelVisible = false
+    @Published var mode: UIMode = .anchor
+    @Published var menuStack: [MenuKind] = []
+    @Published var menuFocus: String?
     @Published var scrubTime: Double?        // target while the user is skipping
+    @Published var subtitleDelay = 0.0       // seconds
+    @Published var audioDelayMs = 0
+    @Published var speed: Float = 1.0
+    @Published var toast: String?
+
+    var lastTool = 0
+    var lastSubtitleID: Int?
 
     private var bag = Set<AnyCancellable>()
     private var loadTask: Task<Void, Never>?
     private var hideTask: Task<Void, Never>?
     private var seekTask: Task<Void, Never>?
+    private var toastTask: Task<Void, Never>?
     private var lastSeekPress = Date.distantPast
     private var seekPressCount = 0
     private var lastResumeSave = Date.distantPast
@@ -62,6 +85,8 @@ final class PlayerModel: ObservableObject {
                 self.finish(.success)
             case .error(let text):
                 self.loadError = text
+            case .playing:
+                self.touch()
             default:
                 break
             }
@@ -108,11 +133,16 @@ final class PlayerModel: ObservableObject {
         seekTask?.cancel()
         request = req
         loadError = nil
-        panelVisible = false
+        menuStack = []
+        menuFocus = nil
         scrubTime = nil
         currentTime = 0
         duration = 0
-        controlsVisible = true
+        subtitleDelay = 0
+        audioDelayMs = settings.v.audioDelayMs
+        speed = 1.0
+        lastSubtitleID = nil
+        mode = .anchor
 
         var options = LoadOptions()
         settings.apply(to: &options)
@@ -128,7 +158,7 @@ final class PlayerModel: ObservableObject {
                 if Task.isCancelled { return }
                 self.engine.play()
                 if let sub = req.subtitleURL { self.engine.selectSidecarSubtitle(url: sub) }
-                self.showControls()
+                self.touch()
             } catch is CancellationError {
                 // superseded by a newer request
             } catch {
@@ -137,36 +167,98 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    // MARK: - Controls
+    // MARK: - Remote input (everything funnels through these four)
 
-    func togglePlayPause() {
+    func move(_ direction: MoveCommandDirection) {
+        switch mode {
+        case .hidden, .anchor:
+            switch direction {
+            case .left: skip(-1)
+            case .right: skip(1)
+            case .up: mode = .tools(lastTool)
+            case .down: mode = .pills(0)
+            @unknown default: break
+            }
+        case .tools(let i):
+            switch direction {
+            case .left: mode = .tools(max(0, i - 1)); lastTool = max(0, i - 1)
+            case .right: mode = .tools(min(2, i + 1)); lastTool = min(2, i + 1)
+            case .down: mode = .anchor
+            default: break
+            }
+        case .pills(let i):
+            switch direction {
+            case .left: mode = .pills(max(0, i - 1))
+            case .right: mode = .pills(min(1, i + 1))
+            case .up: mode = .anchor
+            default: break
+            }
+        case .menu:
+            menuMove(direction)
+        }
+        touch()
+    }
+
+    func select() {
+        switch mode {
+        case .hidden:
+            engine.togglePlayPause()
+            mode = .anchor
+        case .anchor:
+            engine.togglePlayPause()
+        case .tools(let i):
+            openMenu(tool: i)
+        case .pills:
+            break
+        case .menu:
+            menuSelect()
+        }
+        touch()
+    }
+
+    func playPause() {
         engine.togglePlayPause()
-        showControls()
+        if mode == .hidden { mode = .anchor }
+        touch()
     }
 
-    func showControls() {
-        controlsVisible = true
+    func menuButton() {
+        if loadError != nil { finish(.failure); return }
+        switch mode {
+        case .hidden:
+            finish(.cancel)
+        case .anchor, .tools, .pills:
+            mode = .hidden
+        case .menu:
+            popMenu()
+        }
+        touch()
+    }
+
+    /// Shows the bar for a moment, then hides it again while playing.
+    func touch() {
         hideTask?.cancel()
-        guard state == .playing, !panelVisible else { return }
-        hideTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            if !Task.isCancelled { self?.controlsVisible = false }
+        switch mode {
+        case .anchor, .tools:
+            hideTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                if self.state == .playing, self.mode == .anchor || self.isToolsMode { self.mode = .hidden }
+            }
+        case .pills:
+            hideTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 9_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                if case .pills = self.mode { self.mode = .hidden }
+            }
+        default:
+            break
         }
     }
 
-    func openPanel() {
-        panelVisible = true
-        controlsVisible = true
-        hideTask?.cancel()
-    }
-
-    func handleExit() {
-        if panelVisible {
-            panelVisible = false
-            showControls()
-        } else {
-            finish(loadError != nil ? .failure : .cancel)
-        }
+    private var isToolsMode: Bool {
+        if case .tools = mode { return true }
+        return false
     }
 
     /// Skip forward/back. Quick repeated presses grow the step (x1, x1, x3, x3, x6).
@@ -181,7 +273,7 @@ final class PlayerModel: ObservableObject {
         target = max(0, target)
         if duration > 2 { target = min(target, duration - 2) }
         scrubTime = target
-        showControls()
+        mode = .anchor
 
         seekTask?.cancel()
         seekTask = Task { [weak self] in
@@ -192,22 +284,121 @@ final class PlayerModel: ObservableObject {
         }
     }
 
+    // MARK: - Menus
+
+    func openMenu(tool i: Int) {
+        lastTool = i
+        let kind: MenuKind = i == 0 ? .subtitles : (i == 1 ? .audio : .playback)
+        menuStack = [kind]
+        mode = .menu
+        menuFocus = defaultFocus(for: kind)
+    }
+
+    var currentMenu: MenuKind? { menuStack.last }
+
+    func pushMenu(_ kind: MenuKind) {
+        menuStack.append(kind)
+        menuFocus = defaultFocus(for: kind)
+    }
+
+    func popMenu() {
+        if !menuStack.isEmpty { menuStack.removeLast() }
+        if let top = menuStack.last {
+            menuFocus = defaultFocus(for: top)
+        } else {
+            menuFocus = nil
+            mode = .tools(lastTool)
+        }
+    }
+
+    func closeMenus() {
+        menuStack = []
+        menuFocus = nil
+        mode = .anchor
+    }
+
+    private func defaultFocus(for kind: MenuKind) -> String? {
+        let focusable = rows(for: kind).filter(\.focusable)
+        if kind == .subtitleLanguage { return (focusable.first { $0.selected } ?? focusable.first)?.id }
+        return focusable.first?.id
+    }
+
+    private func menuMove(_ direction: MoveCommandDirection) {
+        guard let kind = currentMenu else { return }
+        let focusable = rows(for: kind).filter(\.focusable)
+        guard !focusable.isEmpty else { return }
+        let index = focusable.firstIndex { $0.id == menuFocus } ?? 0
+        switch direction {
+        case .up: menuFocus = focusable[max(0, index - 1)].id
+        case .down: menuFocus = focusable[min(focusable.count - 1, index + 1)].id
+        case .left: focusable[index].adjust?(-1); objectWillChange.send()
+        case .right: focusable[index].adjust?(1); objectWillChange.send()
+        @unknown default: break
+        }
+    }
+
+    private func menuSelect() {
+        guard let kind = currentMenu else { return }
+        let focusable = rows(for: kind).filter(\.focusable)
+        guard let row = focusable.first(where: { $0.id == menuFocus }) ?? focusable.first else { return }
+        row.select?()
+        objectWillChange.send()
+    }
+
+    // MARK: - Track and playback actions
+
     func selectAudio(_ track: TrackInfo) { engine.selectAudioTrack(index: track.id) }
-    func selectSubtitle(_ track: TrackInfo) { engine.selectSubtitleTrack(index: track.id) }
+
+    func selectSubtitle(_ track: TrackInfo) {
+        lastSubtitleID = track.id
+        engine.selectSubtitleTrack(index: track.id)
+    }
+
     func subtitlesOff() { engine.clearSubtitle() }
+
+    func subtitlesOn() {
+        let id = lastSubtitleID ?? subtitleTracks.first(where: { !$0.isForced })?.id ?? subtitleTracks.first?.id
+        if let id, let track = subtitleTracks.first(where: { $0.id == id }) { selectSubtitle(track) }
+    }
+
+    func setSubtitleDelay(_ seconds: Double) {
+        subtitleDelay = (seconds * 10).rounded() / 10
+        engine.setSoftwareSubtitleDelay(subtitleDelay)
+    }
+
+    func setAudioDelay(ms: Int) {
+        audioDelayMs = max(-1000, min(1000, ms))
+        engine.setAudioDelay(Double(audioDelayMs) / 1000.0)
+    }
+
+    func setSpeed(_ rate: Float) {
+        speed = rate
+        engine.setRate(rate)
+    }
 
     /// Re-apply the current Settings to the playing session (route changes included).
     func reloadWithCurrentSettings() {
         let snapshot = settings
+        showToast("Applying settings…")
         Task { [weak self] in
             guard let self else { return }
             do {
                 _ = try await self.engine.reloadAtCurrentPosition { options in
                     snapshot.apply(to: &options)
                 }
+                self.showToast("Settings applied")
             } catch {
                 self.loadError = "Reload failed: \(error)"
             }
+        }
+    }
+
+    func showToast(_ text: String) {
+        toast = text
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            if !Task.isCancelled { self?.toast = nil }
         }
     }
 
@@ -241,7 +432,8 @@ final class PlayerModel: ObservableObject {
         let target = explicit ?? defaultReturnURL(for: req)
 
         request = nil
-        panelVisible = false
+        menuStack = []
+        menuFocus = nil
         scrubTime = nil
         if outcome == .failure, let err = loadError { message = "Playback failed: \(err)" }
         loadError = nil
@@ -257,29 +449,5 @@ final class PlayerModel: ObservableObject {
         }
         guard let scheme = settings.returnScheme else { return nil }
         return URL(string: scheme + "://")
-    }
-
-    // MARK: - Labels
-
-    func label(for t: TrackInfo) -> String {
-        var parts: [String] = [t.name.isEmpty ? "Track \(t.id)" : t.name]
-        if let lang = t.language, !lang.isEmpty, !t.name.lowercased().contains(lang.lowercased()) {
-            parts.append(lang.uppercased())
-        }
-        parts.append(t.codec.uppercased())
-        if t.channels > 0 { parts.append("\(t.channels) ch") }
-        if t.isAtmos { parts.append("Atmos") }
-        if t.isDTSX { parts.append("DTS:X") }
-        if t.isForced { parts.append("forced") }
-        return parts.joined(separator: " · ")
-    }
-
-    var debugLines: [String] {
-        [
-            "backend \(String(describing: engine.playbackBackend))  route \(String(describing: engine.videoRoute))",
-            "video \(String(describing: engine.videoFormat))  decoder \(engine.activeVideoDecoder ?? "-")",
-            "audio \(String(describing: engine.audioDelivery))  decoder \(engine.activeAudioDecoder ?? "-")",
-            "seekable \(String(describing: engine.isSourceSeekable))  buffering \(isBuffering)",
-        ]
     }
 }

@@ -55,7 +55,7 @@ def make_layers(w, h, seed=SEED):
     a = np.array(BACK_A, np.float32)
     b = np.array(BACK_B, np.float32)
     back = a * (1 - t) + b * t
-    back += grain(w, h, rng, 6.0)[..., None]
+    back += grain(w, h, rng, 2.6)[..., None]
     # slow flicker bands
     back *= (1.0 + 0.025 * np.sin(yy / h * 9.0 + 0.7))[..., None]
     back_img = Image.fromarray(np.clip(back, 0, 255).astype(np.uint8), "RGB")
@@ -73,6 +73,23 @@ def make_layers(w, h, seed=SEED):
         c = py.choice(((235, 228, 210, 120), (10, 9, 8, 150)))
         dr.ellipse([x - s, y - s, x + s, y + s], fill=c)
 
+    # film strips down both sides: dark band, pale sprocket holes, thin frame line
+    strip_w = w * 0.092
+    sd2 = ImageDraw.Draw(back_img, "RGBA")
+    for x0, x1 in ((0, strip_w), (w - strip_w, w)):
+        sd2.rectangle([x0, 0, x1, h], fill=(9, 8, 7, 235))
+    hole_w, hole_h = strip_w * 0.34, h * 0.052
+    pitch = h * 0.098
+    n_holes = int(h / pitch) + 2
+    for cxs in (strip_w * 0.5, w - strip_w * 0.5):
+        for k in range(n_holes):
+            y = k * pitch + pitch * 0.3 + py.uniform(-1.0, 1.0) * (h / 768)
+            sd2.rounded_rectangle([cxs - hole_w / 2, y, cxs + hole_w / 2, y + hole_h],
+                                  radius=hole_h * 0.28, fill=PAPER + (214,))
+    edge = max(2, int(h * 0.006))
+    for xe in (strip_w, w - strip_w):
+        sd2.line([(xe, 0), (xe, h)], fill=PAPER + (110,), width=edge)
+
     # ---- middle: rings, crosshair, sweep wedge (transparent)
     mid = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     md = ImageDraw.Draw(mid, "RGBA")
@@ -84,8 +101,8 @@ def make_layers(w, h, seed=SEED):
     # crosshair across the whole frame, broken around the numeral
     gap = r * 0.36
     lw = max(2, int(h * 0.008))
-    md.line([(0, cy), (cx - gap, cy)], fill=ink, width=lw)
-    md.line([(cx + gap, cy), (w, cy)], fill=ink, width=lw)
+    md.line([(strip_w, cy), (cx - gap, cy)], fill=ink, width=lw)
+    md.line([(cx + gap, cy), (w - strip_w, cy)], fill=ink, width=lw)
     md.line([(cx, 0), (cx, cy - gap)], fill=ink, width=lw)
     md.line([(cx, cy + gap), (cx, h)], fill=ink, width=lw)
     # tick marks on the outer ring
@@ -164,8 +181,8 @@ def save_stack(folder_name, w1, h1):
         os.makedirs(iset, exist_ok=True)
         img2x = img
         img1x = img.resize((w1, h1), Image.LANCZOS)
-        img1x.save(os.path.join(iset, stem + ".png"))
-        img2x.save(os.path.join(iset, stem + "@2x.png"))
+        img1x.save(os.path.join(iset, stem + ".png"), optimize=True)
+        img2x.save(os.path.join(iset, stem + "@2x.png"), optimize=True)
         write_json(os.path.join(iset, "Contents.json"), {
             "images": [
                 {"idiom": "tv", "filename": stem + ".png", "scale": "1x"},
@@ -179,12 +196,12 @@ def save_flat_set(name, w1, h1):
     iset = os.path.join(BRAND, name + ".imageset")
     os.makedirs(iset, exist_ok=True)
     big = flat(w1 * 2, h1 * 2)
-    big.save(os.path.join(iset, "image@2x.png"))
-    big.resize((w1, h1), Image.LANCZOS).save(os.path.join(iset, "image.png"))
+    big.save(os.path.join(iset, "image@2x.jpg"), quality=82, optimize=True)
+    big.resize((w1, h1), Image.LANCZOS).save(os.path.join(iset, "image.jpg"), quality=82, optimize=True)
     write_json(os.path.join(iset, "Contents.json"), {
         "images": [
-            {"idiom": "tv", "filename": "image.png", "scale": "1x"},
-            {"idiom": "tv", "filename": "image@2x.png", "scale": "2x"},
+            {"idiom": "tv", "filename": "image.jpg", "scale": "1x"},
+            {"idiom": "tv", "filename": "image@2x.jpg", "scale": "2x"},
         ],
         "info": INFO,
     })

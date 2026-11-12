@@ -63,8 +63,19 @@ Notes from the engine docs:
 - The dual-layer route only takes streams up to UHD at 30 fps plus a 1080p enhancement layer; anything heavier silently keeps the normal route.
 - Settings apply to the next playback. During playback, press ▲ or ▼, then "Reload with current Settings" (`reloadAtCurrentPosition(applying:)`).
 
-## Remote control
-◀ ▶ skip (grows with quick repeats), ▲ ▼ audio / subtitle / info panel, Select or Play/Pause toggles pause, Menu closes the panel, then leaves the player and opens `lampa://` (or the return address in the link, or "stay in this app", see Settings).
+## Remote control and screens
+The look follows a tvOS-style design (glass panels, white focus capsules). It was drawn from photos of a similar player plus its public layout notes; no code was copied.
+
+While playing:
+- ◀ ▶ skip (the step grows with quick repeats; set the length in Settings), Select or Play/Pause toggles pause.
+- ▲ shows the round buttons at the bottom right: **Subtitles**, **Audio**, **Playback**. Select opens a glass menu (arrows move, ◀ ▶ adjust a Delay row, Menu goes back).
+  - Subtitles: On / Off, Language, Size, Delay.
+  - Audio: Delay, then the audio tracks.
+  - Playback: Speed, Dolby Vision FEL, Height Speakers, Upscale, and "Apply changes now" (reloads at the current position).
+- ▼ opens the **Info** and **Details** panes (◀ ▶ switches). Details shows video, audio and decode/stream facts read from the engine.
+- Menu hides the bar; Menu again leaves the player and opens `lampa://` (or the return address in the link, or stays, see Settings).
+
+Settings (the home screen of the app) are two columns: Playback, Video, Audio, Subtitles, Lampa, About.
 
 ## Build
 Needs macOS and Xcode (the engine's README says Xcode 27). CI does this:
