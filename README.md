@@ -1,8 +1,8 @@
-# Wick (draft)
+# Wick
 
 A small tvOS player built on [AetherEngine](https://github.com/superuser404notfound/AetherEngine) that Lampa can use as an external player for torrent streams.
 
-**Status: drafted on Windows, never compiled or run.** There is no Mac here. The first real build happens on a GitHub macOS runner, and the first real test on the Apple TV. Expect a few compile fixes.
+**Status: version 0.2.0 compiles and runs on a real Apple TV.** It is developed on Windows and built on a GitHub macOS runner, then sideloaded with atvloadly.
 
 ## How Lampa reaches it
 Lampa has no hook to register a new player. On Apple TV it picks a URL template from its player setting and opens it with `window.location.assign(...)`. The torrent player list is `tvospro`, `tvos`, `tvosSelect`, `vlc`, `infuse`, `senplayer`, `vidhub`, `inner`, `svplayer`. This app registers the URL scheme of one of them:
@@ -58,8 +58,8 @@ They map onto real `LoadOptions` fields of the engine.
 Defaults: FEL = enhanced conversion (the engine default), Atmos = render to **5.1.2**.
 
 Notes from the engine docs:
-- FEL, TrueHD and DTS:X need optional components ("package traits"). `HostDeps/Package.swift` switches on `TrueHDObjectAudio`, `DTSXObjectAudio`, `DualLayerDolbyVision`, `DolbyVisionFelCurves`. The Settings screen shows which ones are really in the build and warns when a chosen setting would do nothing. The engine warns that some of these components "may be subject to third-party patent licensing"; this is a private build for one device, but it is your call. Delete a trait from that file to leave it out.
-- Full dual-layer FEL on the software host decodes Atmos (E-AC-3 JOC) as its 5.1/7.1 core, without the objects. The AVPlayer-output route keeps AVPlayer's audio but "has not been run on tvOS" according to the engine.
+- FEL, TrueHD and DTS:X need optional components ("package traits"). `HostDeps/Package.swift` switches on `TrueHDObjectAudio`, `DTSXObjectAudio`, `DualLayerDolbyVision`, `DolbyVisionFelCurves`. The Settings screen shows which ones are really in the build and warns when a chosen setting would do nothing. The engine warns that some of these components "may be subject to third-party patent licensing"; check that this is acceptable for your use. Delete a trait from that file to leave it out.
+- Full dual-layer FEL on the software host decodes Atmos (E-AC-3 JOC) as its 5.1/7.1 core, without the objects. The AVPlayer-output route keeps AVPlayer's audio. The engine docs say it "has not been run on tvOS", but it passed Wick's Profile 7 FEL test on a real Apple TV.
 - The dual-layer route only takes streams up to UHD at 30 fps plus a 1080p enhancement layer; anything heavier silently keeps the normal route.
 - Settings apply to the next playback. During playback, press ▲ or ▼, then "Reload with current Settings" (`reloadAtCurrentPosition(applying:)`).
 
@@ -80,33 +80,35 @@ Settings (the home screen of the app) are two columns: Playback, Video, Audio, S
 ## Build
 Needs macOS and Xcode (the engine's README says Xcode 27). CI does this:
 
-1. Make this folder its own **private** GitHub repo (it is self-contained; the workflow is in `.github/workflows/build-ipa.yml`).
+1. Put a **private** copy of this repository on GitHub (the workflow is in `.github/workflows/build-ipa.yml`).
 2. Run the workflow "Build unsigned IPA" (also runs on push to `main`).
 3. Download the `Wick-ipa` artifact → `Wick.ipa`. If the build fails, the `build-log` artifact has the full log.
+
+The workflow publishes the IPA only from a private repository. No prebuilt IPA is offered here, because the build can include components that may need patent licenses.
 
 Locally on a Mac: `brew install xcodegen && xcodegen generate`, then open `Wick.xcodeproj`.
 
 ## Install
-1. atvloadly web UI → upload `Wick.ipa` → install with your Apple ID.
+1. In the atvloadly web UI, choose your Apple TV, upload `Wick.ipa` and install it with your Apple ID.
 2. A free Apple ID allows **3 active sideloaded apps**. atvloadly refreshes them on its schedule.
 3. In Lampa: Settings → Player → the Apple TV torrent player → **SenPlayer**.
 4. Start a torrent movie in Lampa. Lampa opens this app.
 
-## First test checklist
-- [ ] CI builds (expect to fix compile errors against the real engine API)
-- [ ] IPA installs through atvloadly and the app icon shows (no icon asset is included; tvOS may show a blank tile)
-- [ ] Lampa → SenPlayer opens the app and playback starts from a TorrServer URL
-- [ ] **Seeking works** on an `http://…/stream/…mkv?link=…&play` URL (the engine docs do not confirm HTTP range seeking for progressive MKV; the Settings "technical info" shows `seekable`)
-- [ ] Audio and subtitle switching, PGS bitmap subtitles in the right place
-- [ ] HDR10 / Dolby Vision triggers the TV's mode switch (tvOS "Match Content")
-- [ ] TrueHD Atmos with "Render to 5.1.2" reaches the receiver as Atmos
-- [ ] A Profile 7 FEL title in each FEL mode
-- [ ] Menu returns to the Lampa app (`lampa://` may not be handled by every Lampa client; if not, pick "Stay in this app")
-- [ ] The app refreshes at the next atvloadly window
+## Test checklist
+- [x] CI builds
+- [x] IPA installs and the app runs on a real Apple TV
+- [x] Lampa → SenPlayer opens the app and playback starts from a TorrServer URL
+- [x] **Seeking works** on an `http://…/stream/…mkv?link=…&play` URL
+- [x] Audio and subtitle switching, PGS bitmap subtitles in the right place
+- [x] HDR10 / Dolby Vision triggers the TV's mode switch (tvOS "Match Content")
+- [x] TrueHD Atmos with "Render to 5.1.2" reaches the receiver as Atmos
+- [x] A Profile 7 FEL title in each FEL mode
+- [x] Menu returns to the Lampa app (`lampa://` may not be handled by every Lampa client; if not, pick "Stay in this app")
+- [x] The app refreshes at the next atvloadly window
 
-## Known unknowns
-- Not compiled. The API calls were taken from the engine's source at its current `main`, not from a build.
+## Notes and open questions
 - `Info.plist` is generated by XcodeGen. App Transport Security is opened fully (`NSAllowsArbitraryLoads`) because TorrServer is plain http on the LAN.
-- The engine's minimum is tvOS 18 / Xcode 27 / Swift 6.4 per its README; the GitHub `macos-latest` image may not have that Xcode yet. If so, the build fails at package resolution and the fix is to wait for the image, pin an older engine tag that builds with the installed Xcode, or use a self-hosted runner.
-- License: AetherEngine is LGPL-3.0 with an App Store exception; its docs do not mention sideloaded apps. FFmpeg inside is LGPL and is embedded dynamically. Nothing here is distributed.
-- Rivulet's settings screen was not inspected (no access to it). The settings above are the ones the engine exposes; tell me which Rivulet options you want matched and I will add them if the engine supports them.
+- The engine's minimum is tvOS 18 / Xcode 27 / Swift 6.4 per its README. If a future `macos-latest` image lacks a suitable Xcode, the build fails at package resolution. The fix is to pin an engine tag that builds with the installed Xcode, or use a self-hosted runner.
+
+## License
+Wick's own code is under the [MIT License](LICENSE). AetherEngine (LGPL-3.0 with an App Store exception) and FFmpeg (LGPL, embedded dynamically) keep their own licenses and are not covered by it. AetherEngine's docs do not mention sideloaded apps, so review these terms before distributing a built IPA.
