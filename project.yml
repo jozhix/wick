@@ -9,8 +9,8 @@ options:
 
 packages:
   # Local wrapper that depends on AetherEngine with its optional components
-  # (package traits) switched on. See HostDeps/Package.swift. Pin the engine
-  # version there once a build has been tested.
+  # (package traits) switched on. The engine version is pinned in
+  # HostDeps/Package.swift.
   HostDeps:
     path: HostDeps
 

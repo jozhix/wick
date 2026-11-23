@@ -6,7 +6,7 @@
 //
 // The traits compile in code that may be subject to third-party patent licensing
 // (the engine's own comment: "an integrator that enables one is responsible for its
-// own licensing"). This app is for private use on one device. Remove a trait from
+// own licensing"). Check this before distributing a build. Remove a trait from
 // the list below to leave that component out; the matching setting then does nothing
 // and the Settings screen says so.
 import PackageDescription
@@ -20,7 +20,9 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/superuser404notfound/AetherEngine",
-            from: "7.64.0",
+            // Pinned to the version tested on a real Apple TV. Newer releases can
+            // break the build (7.73.0 does not compile with Xcode 26.6).
+            exact: "7.64.0",
             traits: [
                 "TrueHDObjectAudio",   // TrueHD Atmos -> 5.1.2 / 7.1.4 ... rendering
                 "DTSXObjectAudio",     // DTS:X heights rendering
